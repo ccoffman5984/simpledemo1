@@ -1,0 +1,40 @@
+---
+- hosts: reverse_proxy 
+  remote_user: ec2-user
+  become: yes
+  become_method: sudo
+
+  vars:
+    public_dns: "ec2-3-94-105-9.compute-1.amazonaws.com"
+    conf_file: "/home/ec2-user/simpledemo1/nginx.conf"
+
+  tasks:
+  - name: install nginx
+    shell: amazon-linux-extras install nginx1.12 -y
+
+  - name: configure backend host group
+    lineinfile:
+      path: "{{ conf_file }}"
+      state: present
+      insertafter: "upstream"
+      line: "      server {{ item }}:8080;"
+    with_inventory_hostnames:
+      - app_servers
+
+  - name: setup the default server block
+    lineinfile:
+      path: "{{ conf_file }}"
+      state: present
+      insertafter: "listen"
+      line: "      server_name  {{ public_dns }};"
+
+  - name: ovewrite nginx.conf
+    shell: "cp {{ conf_file }} /etc/nginx"
+
+  - name: enable nginx
+    shell: systemctl enable nginx
+
+  - name: start nginx
+    service:
+      name: nginx
+      state: started
